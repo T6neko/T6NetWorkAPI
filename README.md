@@ -84,7 +84,7 @@ async function checkJoin(player) {
 }
 ```
 
-動く完全なサンプルは [scripts/example.js](scripts/example.js) を見てください。
+動く完全なサンプルは [scripts/main.js](scripts/main.js) を見てください。
 
 #### 関数一覧
 
@@ -129,6 +129,6 @@ scriptevent一覧の詳細は [API.md](API.md) にまとめています。
 | --- | --- |
 | `manifest.json` | このBehavior Packのサンプルマニフェスト |
 | `scripts/api/index.js` | API本体（Ping取得・`import`公開・`scriptevent`受け口） |
-| `scripts/example.js` | importで呼び出す場合の使用例 |
+| `scripts/main.js` | importで呼び出す場合の使用例 |
 | `config/default/permissions.json` | BDS側に必要な権限設定のサンプル |
 | `API.md` | 内部の仕組み（フォールバックの流れ・レスポンス形式など） |
