@@ -1,0 +1,29 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "T6NetWork API",
+    "description": "読み取り専用ステータス確認API",
+    "uuid": "uuid1",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 26, 2]
+  },
+  "modules": [
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "uuid2",
+      "entry": "scripts/api/index.js",
+      "version": [1, 0, 0]
+    }
+  ],
+  "dependencies": [
+    {
+      "module_name": "@minecraft/server",
+      "version": "beta"
+    },
+    {
+      "module_name": "@minecraft/server-net",
+      "version": "beta"
+    }
+  ]
+}

@@ -1,94 +1,82 @@
-# T6NetWork Addon 組み込みAPI
+# T6NetWork API 仕組み
 
-このアドオンはプレイヤー転送などは行わず、**指定したサーバーのPing・バージョン・人数を返すだけ**の読み取り専用APIです。`scripts/api/index.js` の1ファイルだけで完結します。
-呼び出し方法は2種類あります。
+使い方（導入方法・呼び出し方のコード例）は [README.md](README.md) を参照してください。
+ここでは、内部でどう動いているかをまとめます。
 
-- **import経由**（JavaScriptパック向け・推奨。`scripts/api/index.js`を自分のパックにコピーして`import`します）
-- **scriptevent経由**（`.mcfunction`やコマンドブロックなど、JavaScript以外からも呼べるリクエスト/レスポンス方式）
+## 全体像
 
-Minecraft Bedrockは別のBehavior Packのスクリプトを`import`で直接参照できないため、`scripts/api/index.js`を呼び出したい側のパックの`scripts`フォルダにコピーし、通常のJavaScriptと同じように`import`して使います。
+`scripts/api/index.js` はこの3つの役割を1ファイルで持っています。
 
-## Ping取得元（フォールバック対応）
+1. 外部ステータスAPIへの問い合わせ（フォールバック込み）
+2. 問い合わせ結果を`export`関数として公開（`import`する側向け）
+3. `scriptevent`のリクエストを受けて、同じ関数を呼び出し、結果を別の`scriptevent`で返す（JS以外から呼ぶ側向け）
 
-サーバーステータスの取得には [mcstatus.io](https://mcstatus.io/) を第一候補として使い、失敗した場合（タイムアウト・エラー応答など）は自動的に [mcsrvstat.us](https://api.mcsrvstat.us/) にフォールバックします。どちらか片方が落ちていても動作し続けるようにするための仕組みです。両方とも失敗した場合のみ `{ online: false, version: null, players: { online: 0, max: 0 } }` を返します。
+```
+呼び出し側
+  ├─ import { getServerStatus, canJoin } from "./api/index.js"  … 直接関数呼び出し
+  └─ /scriptevent t6:api_status / t6:api_canJoin                … リクエスト/レスポンス
+                          │
+                          ▼
+              scripts/api/index.js
+                          │
+              fetchStatus(ip, port)
+                          │
+              ┌───────────┴───────────┐
+              ▼                       ▼
+        mcstatus.io              失敗したら
+       （第一候補）          mcsrvstat.us にフォールバック
+```
 
-## 動作要件
+## Ping取得のフォールバック
 
-このアドオンは **Bedrock Dedicated Server（統合版専用サーバー）専用** です。HTTP通信に使う `@minecraft/server-net` はBDS上でしか動作しないため、シングルプレイ／フレンドとのLAN接続／Realms／統合版クライアントでホストしたワールドでは動作しません。
+サーバーのPing・バージョン・人数は、外部の無料ステータスAPIに問い合わせて取得しています（BDS自体には他サーバーの状態を調べる標準機能が無いため）。
 
-また、BDS側で `@minecraft/server-net` の使用を許可する必要があります。サーバー実行ファイルと同じ階層にある `config/default/permissions.json` を、次の内容にしてください（存在しない場合は新規作成してください）。この設定がないと、このアドオンが依存する `@minecraft/server-net` の読み込みに失敗し、APIが機能しません。
+1. まず [mcstatus.io](https://mcstatus.io/) の `https://api.mcstatus.io/v2/status/bedrock/<ip>:<port>` に問い合わせます。
+2. タイムアウト（7秒）・接続エラー・HTTPエラーのいずれかが起きた場合のみ、[mcsrvstat.us](https://api.mcsrvstat.us/) の `https://api.mcsrvstat.us/bedrock/3/<ip>:<port>` にフォールバックします（このAPIは`User-Agent`ヘッダーが必須のため付与しています）。
+3. 両方とも失敗した場合は、対象サーバーが本当にオフラインなのか判別できないため、安全側に倒して `{ online: false, version: null, players: { online: 0, max: 0 } }` を返します。
 
-```json
+2つのAPIはレスポンスの形が微妙に違います（`version`が文字列で返るか`{ name: "..." }`のようなオブジェクトで返るか）。この差は`normalizeStatus()`で吸収し、呼び出し側には常に同じ形のオブジェクトを返しています。
+
+「稼働中だが応答が無い」ことと「サービス自体が落ちていて判定できない」ことを区別するため、フォールバックが発生するのは**問い合わせ自体が失敗したとき**だけで、片方のAPIが「正常にオフラインと答えた」場合はそのまま`online: false`として扱い、もう片方には問い合わせません（本当にオフラインなサーバーへ余計なリクエストを送らないため）。
+
+## レスポンス形式
+
+`getServerStatus(ip, port)` が返す形（`canJoin`の内部でも同じ形を使っています）。
+
+```ts
 {
-  "allowed_modules": [
-    "@minecraft/server-gametest",
-    "@minecraft/server",
-    "@minecraft/server-ui",
-    "@minecraft/server-admin",
-    "@minecraft/server-editor",
-    "@minecraft/debug-utilities",
-    "@minecraft/server-net"
-  ]
+  online: boolean,
+  version: string | null,
+  players: {
+    online: number,
+    max: number
+  }
 }
 ```
 
-## 1. import経由の呼び出し（JavaScriptパック向け）
+`canJoin(ip, port)` は上記を取得した上で、`online && players.online < players.max` を計算して真偽値だけを返しているだけの薄いラッパーです。
 
-`scripts/api/index.js` を、呼び出したい側のBehavior Packの `scripts` フォルダにコピーしてください（配置場所は自由です。以下は `scripts/api/index.js` にコピーした場合の例）。
+## import経由の公開方法
 
-```js
-import { getServerStatus, canJoin } from "./api/index.js";
+Minecraft Bedrockでは、別のBehavior Packのスクリプトを`import`で直接参照する仕組みが無いため、`scripts/api/index.js`は「呼び出したい側のパックにファイルごとコピーしてもらい、通常のES Modulesとして`import`してもらう」という前提で作られています。`globalThis`に登録するような特別な処理は行っていません。
 
-// サーバーの稼働状況・バージョン・人数をまとめて取得
-const status = await getServerStatus("play.example.com", 19132);
-// => { online: true, version: "1.26.4", players: { online: 5, max: 20 } }
+## scriptevent経由の公開方法
 
-// 単純に「今すぐ入れるか」だけを真偽値で取得（稼働中 かつ 満員でない）
-const joinable = await canJoin("play.example.com", 19132);
-// => true / false
-```
+`.mcfunction`やコマンドブロックはJavaScriptの`import`に触れないため、`system.afterEvents.scriptEventReceive`を購読し、`t6:api_`で始まるIDのイベントだけを処理しています。
 
-### 公開されている関数
+- リクエストの`message`はJSON文字列（`{ id, ip, port }`）として解釈されます。
+- 処理が終わると、`system.sendScriptEvent("<受け取ったID>_result", JSON.stringify({ id, result }))`で応答を送り返します。
+- リクエストに`id`を含めなかった場合は、応答が必要ないものとみなして何も送信しません（`respond()`内で`requestId === undefined`のときに早期return）。
 
-| 関数 | 説明 |
-| --- | --- |
-| `apiVersion` | APIのバージョン文字列 |
-| `getServerStatus(ip, port)` | 稼働状況・バージョン・人数をJSONで返す。`Promise<{ online, version, players: { online, max } }>` |
-| `canJoin(ip, port)` | 稼働中かつ満員でなければ`true`を返す。`Promise<boolean>` |
-
-## 2. scriptevent経由の呼び出し（`.mcfunction`・コマンドブロックからも可）
-
-`.mcfunction` からは `globalThis` に触れないため、代わりに `scriptevent` を使ったリクエスト/レスポンス方式を用意しています。
-リクエストには任意の `id` を含めておくと、対応するレスポンスに同じ `id` が返るので、どのリクエストへの返答か判別できます（`id`を省略すると応答は送信されません）。
-
-```
-/scriptevent t6:api_status {"id":"req1","ip":"play.example.com","port":19132}
-/scriptevent t6:api_canJoin {"id":"req2","ip":"play.example.com","port":19132}
-```
-
-このアドオン側が処理を終えると、`t6:api_status_result` / `t6:api_canJoin_result` というscripteventを発火します（`system.sendScriptEvent`で送信されるため、受け取るには自分のパック側で `scriptEventReceive` を購読してください）。
-
-```js
-import { system } from "@minecraft/server";
-
-system.afterEvents.scriptEventReceive.subscribe((ev) => {
-    if (ev.id === "t6:api_status_result") {
-        const { id, result } = JSON.parse(ev.message);
-        // result => { online, version, players: { online, max } }
-        console.warn(`request ${id}:`, JSON.stringify(result));
-    }
-
-    if (ev.id === "t6:api_canJoin_result") {
-        const { id, result } = JSON.parse(ev.message);
-        // result => true / false
-        console.warn(`request ${id}:`, result);
-    }
-});
-```
-
-### 使えるscriptevent一覧
+対応しているイベントIDは以下の2つです。
 
 | 送信ID | メッセージ(JSON) | 応答ID | 応答内容 |
 | --- | --- | --- | --- |
 | `t6:api_status` | `{id, ip, port}` | `t6:api_status_result` | `{id, result: { online, version, players: { online, max } }}` |
 | `t6:api_canJoin` | `{id, ip, port}` | `t6:api_canJoin_result` | `{id, result: true / false}` |
+
+`port`を省略した場合は`19132`（Bedrockのデフォルトポート）が使われます。
+
+## なぜBedrock Dedicated Server限定なのか
+
+Ping取得に使っている `@minecraft/server-net`（HTTPリクエスト）は、BDS上でのみ動作するAPIです。シングルプレイ／フレンドとのLAN接続／Realms／統合版クライアントでホストしたワールドには存在しないため、このアドオンはBDS専用になっています。
