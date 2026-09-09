@@ -18,7 +18,7 @@ Minecraft Bedrock Dedicated Server（統合版専用サーバー）向けの、*
 ## 動作要件
 
 - **Bedrock Dedicated Server（統合版専用サーバー）専用**です。シングルプレイ／フレンドとのLAN接続／Realms／統合版クライアントでホストしたワールドでは動作しません。
-- サーバー実行ファイルと同じ階層にある `config/default/permissions.json` に `@minecraft/server-net` を許可しておく必要があります（[サンプル](config/default/permissions.json) を参照、または以下をコピー）。
+- サーバー実行ファイルと同じ階層にある `config/default/permissions.json` に `@minecraft/server-net` を許可しておく必要があります（存在しない場合は以下の内容で新規作成してください）。
 
 ```json
 {
@@ -133,5 +133,4 @@ scriptevent一覧の詳細は [API.md](API.md) にまとめています。
 | `manifest.json` | このBehavior Packのサンプルマニフェスト |
 | `scripts/api/index.js` | API本体（Online/Offline状態の取得・`import`公開・`scriptevent`受け口） |
 | `scripts/main.js` | importで呼び出す場合の使用例 |
-| `config/default/permissions.json` | BDS側に必要な権限設定のサンプル |
 | `API.md` | 内部の仕組み（フォールバックの流れ・レスポンス形式など） |
