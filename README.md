@@ -4,13 +4,16 @@ Minecraft Bedrock Dedicated Server（統合版専用サーバー）向けの、*
 
 指定したIPとポートに対して、
 
-- サーバーが起動しているか（Ping / online-offline）
+- サーバーが起動しているか（Online / Offline）
 - バージョン
 - 人数（現在の人数 / 最大人数）
 
 を取得できます。プレイヤーの転送などの機能は持たず、**状態の取得だけ**を行います。
 
 内部の仕組み（フォールバックの詳細やレスポンス形式など）は [API.md](API.md) を参照してください。このREADMEは「使い方」に絞って説明します。
+
+> [!NOTE]
+> Online/Offlineの判定・バージョン・人数の取得には、[mcstatus.io](https://mcstatus.io/) / [mcsrvstat.us](https://api.mcsrvstat.us/) という外部のサーバーステータス確認サービスを利用しています（BDS自体には他サーバーの状態を調べる標準機能が無いため）。片方が失敗した場合はもう片方に自動でフォールバックします。詳しい仕組みは [API.md](API.md) を参照してください。
 
 ## 動作要件
 
@@ -128,7 +131,7 @@ scriptevent一覧の詳細は [API.md](API.md) にまとめています。
 | ファイル | 役割 |
 | --- | --- |
 | `manifest.json` | このBehavior Packのサンプルマニフェスト |
-| `scripts/api/index.js` | API本体（Ping取得・`import`公開・`scriptevent`受け口） |
+| `scripts/api/index.js` | API本体（Online/Offline状態の取得・`import`公開・`scriptevent`受け口） |
 | `scripts/main.js` | importで呼び出す場合の使用例 |
 | `config/default/permissions.json` | BDS側に必要な権限設定のサンプル |
 | `API.md` | 内部の仕組み（フォールバックの流れ・レスポンス形式など） |

@@ -27,9 +27,9 @@
        （第一候補）          mcsrvstat.us にフォールバック
 ```
 
-## Ping取得のフォールバック
+## Online/Offline判定のフォールバック
 
-サーバーのPing・バージョン・人数は、外部の無料ステータスAPIに問い合わせて取得しています（BDS自体には他サーバーの状態を調べる標準機能が無いため）。
+サーバーのOnline/Offline状態・バージョン・人数は、外部の無料ステータスAPIに問い合わせて取得しています（BDS自体には他サーバーの状態を調べる標準機能が無いため）。
 
 1. まず [mcstatus.io](https://mcstatus.io/) の `https://api.mcstatus.io/v2/status/bedrock/<ip>:<port>` に問い合わせます。
 2. タイムアウト（7秒）・接続エラー・HTTPエラーのいずれかが起きた場合のみ、[mcsrvstat.us](https://api.mcsrvstat.us/) の `https://api.mcsrvstat.us/bedrock/3/<ip>:<port>` にフォールバックします（このAPIは`User-Agent`ヘッダーが必須のため付与しています）。
@@ -79,4 +79,4 @@ Minecraft Bedrockでは、別のBehavior Packのスクリプトを`import`で直
 
 ## なぜBedrock Dedicated Server限定なのか
 
-Ping取得に使っている `@minecraft/server-net`（HTTPリクエスト）は、BDS上でのみ動作するAPIです。シングルプレイ／フレンドとのLAN接続／Realms／統合版クライアントでホストしたワールドには存在しないため、このアドオンはBDS専用になっています。
+Online/Offline状態の取得に使っている `@minecraft/server-net`（HTTPリクエスト）は、BDS上でのみ動作するAPIです。シングルプレイ／フレンドとのLAN接続／Realms／統合版クライアントでホストしたワールドには存在しないため、このアドオンはBDS専用になっています。
